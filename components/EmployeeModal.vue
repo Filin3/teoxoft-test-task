@@ -10,11 +10,11 @@
       <div class="employee-modal">
         <!-- Закрытие модалки нажатии -->
         <Icon class="employee-modal__close" name="ep:close" size="1.5rem" @click="closeEmployeeModal()" />
-        <v-input type="text" placeholder="Имя" v-model="name" />
-        <v-input type="text" placeholder="Фамилия" v-model="secondName" />
-        <v-input type="number" placeholder="Стаж" min="0" v-model="workExperience" />
-        <v-input type="number" placeholder="Возраст" min="0" v-model="age" />
-        <v-input type="text" placeholder="Адрес" v-model="address" />
+        <v-input type="text" placeholder="Имя" v-model="v.name.$model" :error="v.name.$error" />
+        <v-input type="text" placeholder="Фамилия" v-model="v.secondName.$model" :error="v.secondName.$error" />
+        <v-input type="number" placeholder="Стаж" min="0" v-model="v.workExperience.$model" :error="v.workExperience.$error" />
+        <v-input type="number" placeholder="Возраст" min="14" v-model="v.age.$model" :error="v.age.$error" />
+        <v-input type="text" placeholder="Адрес" v-model="v.address.$model" :error="v.address.$error" />
         <!-- 
           Условная отрисовка кнопки переводящая компонент в режим добавления/редактирования
         -->
@@ -27,6 +27,8 @@
 
 <script lang="ts" setup>
 import type { IEmployee } from "types";
+import { useVuelidate } from "@vuelidate/core";
+import { required, minLength, maxLength, minValue, maxValue, integer } from "@vuelidate/validators";
 
 /*
   Инициализация константы хранилища модального окна сотрудника и дальнейшая её деструктуризация
@@ -52,33 +54,54 @@ const age = ref<number | null>(null);
 const address = ref<string | null>(null);
 
 /*
-  Обработчик события "добавления сотрудника" 
+  Инициализация правил vuelidate
 */
-function add() {
-  //добавление сотрудника
-  addEmployee(collectData());
-  //вызов функции закрытия модального окна
-  closeEmployeeModal();
+const rules = computed(() => ({
+  name: { required, minLength: minLength(2), maxLength: maxLength(40), alphaRu },
+  secondName: { required, minLength: minLength(2), maxLength: maxLength(40), alphaRu },
+  workExperience: { required, integer, minValue: minValue(0), maxVaue: maxValue(99) },
+  age: { required, integer, minValue: minValue(14), maxVaue: maxValue(99) },
+  address: { required, minLength: minLength(5), maxLength: maxLength(100) }
+}));
+
+const v = useVuelidate(rules, { name, secondName, workExperience, age, address });
+
+/*
+  Обработчик события "добавления сотрудника"
+*/
+async function add() {
+  //валидация формы
+  if (await v.value.$validate()) {
+    //добавление сотрудника
+    addEmployee(collectData());
+    //вызов функции закрытия модального окна
+    closeEmployeeModal();
+  }
 }
 
 /*
-  Обработчик события "сохранить изменения сотрудника" 
+  Обработчик события "сохранить изменения сотрудника"
 */
-function save() {
-  editEmployee(idEmployee.value!, collectData());
-  closeEmployeeModal();
+async function save() {
+  //валидация формы
+  if (await v.value.$validate()) {
+    //cохранение изменений сотрудника
+    editEmployee(idEmployee.value!, collectData());
+    //вызов функции закрытия модального окна
+    closeEmployeeModal();
+  }
 }
 
 /*
-  Функция сбора данных из полей и объединения их в один объект со значениями по умолчанию
+  Функция сбора данных из полей и объединения их в один объект
 */
 function collectData(): IEmployee {
   return {
-    name: name.value ?? "",
-    secondName: secondName.value ?? "",
-    workExperience: workExperience.value ?? 0,
-    age: age.value ?? 0,
-    address: address.value ?? ""
+    name: name.value!,
+    secondName: secondName.value!,
+    workExperience: workExperience.value!,
+    age: age.value!,
+    address: address.value!
   };
 }
 
@@ -86,6 +109,7 @@ function collectData(): IEmployee {
   Функция очистки полей
 */
 function clearFilelds() {
+  v.value.$reset();
   name.value = null;
   secondName.value = null;
   workExperience.value = null;
